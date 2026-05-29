@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from supabase_client import supabase
+from views.estoque import abrir_estoque
+from views.produtos import abrir_produtos
 
 # ==========================================
 # CONFIG
@@ -60,224 +62,193 @@ def abrir_dashboard():
 
     limpar_tela()
 
+    # ==========================================
+    # TÍTULO
+    # ==========================================
+
     titulo = ctk.CTkLabel(
         main_frame,
         text="Dashboard",
-        font=("Arial", 32, "bold")
-    )
-
-    titulo.pack(pady=30)
-
-    card = ctk.CTkFrame(
-        main_frame,
-        fg_color=COR_CARD,
-        corner_radius=15
-    )
-
-    card.pack(
-        padx=20,
-        pady=20,
-        fill="x"
-    )
-
-    texto = ctk.CTkLabel(
-        card,
-        text="Bem-vindo ao StockFlow",
-        font=("Arial", 20)
-    )
-
-    texto.pack(pady=40)
-
-# ==========================================
-# ESTOQUE
-# ==========================================
-
-def abrir_estoque():
-
-    limpar_tela()
-
-    titulo = ctk.CTkLabel(
-        main_frame,
-        text="Controle de Estoque",
-        font=("Arial", 30, "bold")
+        font=("Arial", 35, "bold")
     )
 
     titulo.pack(pady=20)
 
-    # CARD
-    card = ctk.CTkFrame(
+    # ==========================================
+    # BUSCAR DADOS
+    # ==========================================
+
+    vendas_response = supabase.table(
+        "vendas"
+    ).select("*").execute()
+
+    vendas = vendas_response.data
+
+    produtos_response = supabase.table(
+        "produtos"
+    ).select("*").execute()
+
+    produtos = produtos_response.data
+
+    insumos_response = supabase.table(
+        "insumos"
+    ).select("*").execute()
+
+    insumos = insumos_response.data
+
+    # ==========================================
+    # CÁLCULOS
+    # ==========================================
+
+    faturamento_total = 0
+
+    for venda in vendas:
+        faturamento_total += venda["valor_total"]
+
+    total_vendas = len(vendas)
+
+    total_produtos = len(produtos)
+
+    estoque_baixo = 0
+
+    for insumo in insumos:
+
+        if insumo["quantidade"] <= 5:
+            estoque_baixo += 1
+
+    # ==========================================
+    # FRAME DOS CARDS
+    # ==========================================
+
+    cards_frame = ctk.CTkFrame(
+        main_frame,
+        fg_color="transparent"
+    )
+
+    cards_frame.pack(
+        fill="x",
+        padx=20,
+        pady=20
+    )
+
+    # ==========================================
+    # FUNÇÃO CARD
+    # ==========================================
+
+    def criar_card(titulo, valor, cor):
+
+        card = ctk.CTkFrame(
+            cards_frame,
+            fg_color=cor,
+            corner_radius=20,
+            width=250,
+            height=150
+        )
+
+        card.pack(
+            side="left",
+            padx=15,
+            pady=10,
+            expand=True,
+            fill="both"
+        )
+
+        texto_titulo = ctk.CTkLabel(
+            card,
+            text=titulo,
+            font=("Arial", 20)
+        )
+
+        texto_titulo.pack(pady=(25, 10))
+
+        texto_valor = ctk.CTkLabel(
+            card,
+            text=valor,
+            font=("Arial", 32, "bold")
+        )
+
+        texto_valor.pack()
+
+    # ==========================================
+    # CARDS
+    # ==========================================
+
+    criar_card(
+        "Faturamento",
+        f"R$ {faturamento_total:.2f}",
+        "#2563eb"
+    )
+
+    criar_card(
+        "Vendas",
+        str(total_vendas),
+        "#16a34a"
+    )
+
+    criar_card(
+        "Produtos",
+        str(total_produtos),
+        "#9333ea"
+    )
+
+    criar_card(
+        "Estoque Baixo",
+        str(estoque_baixo),
+        "#dc2626"
+    )
+
+    # ==========================================
+    # TABELA DE ALERTAS
+    # ==========================================
+
+    frame_alertas = ctk.CTkFrame(
         main_frame,
         fg_color=COR_CARD,
-        corner_radius=15
+        corner_radius=20
     )
 
-    card.pack(
+    frame_alertas.pack(
+        fill="both",
+        expand=True,
         padx=20,
-        pady=10,
-        fill="x"
+        pady=20
     )
 
-    # ENTRADAS
-    entry_nome = ctk.CTkEntry(
-        card,
-        placeholder_text="Nome do insumo"
+    titulo_alerta = ctk.CTkLabel(
+        frame_alertas,
+        text="⚠️ Alertas de Estoque",
+        font=("Arial", 24, "bold")
     )
 
-    entry_nome.pack(
-        padx=20,
-        pady=10,
-        fill="x"
-    )
+    titulo_alerta.pack(pady=20)
 
-    entry_quantidade = ctk.CTkEntry(
-        card,
-        placeholder_text="Quantidade"
-    )
-
-    entry_quantidade.pack(
-        padx=20,
-        pady=10,
-        fill="x"
-    )
-
-    entry_unidade = ctk.CTkEntry(
-        card,
-        placeholder_text="Unidade"
-    )
-
-    entry_unidade.pack(
-        padx=20,
-        pady=10,
-        fill="x"
-    )
-
-    # LISTA
     tabela = ctk.CTkTextbox(
-        main_frame,
-        font=("Consolas", 15),
-        fg_color=COR_CARD
+        frame_alertas,
+        fg_color="#0f172a",
+        font=("Consolas", 15)
     )
 
     tabela.pack(
-        padx=20,
-        pady=20,
         fill="both",
-        expand=True
+        expand=True,
+        padx=20,
+        pady=20
     )
 
-    def atualizar_estoque():
+    for insumo in insumos:
 
-        tabela.delete("1.0", "end")
-
-        response = supabase.table("insumos").select("*").execute()
-
-        insumos = response.data
-
-        tabela.insert(
-            "end",
-            "ID | NOME | QUANTIDADE | UNIDADE\n\n"
-        )
-
-        for insumo in insumos:
-
-            alerta = ""
-
-            if insumo["quantidade"] <= 5:
-                alerta = " ⚠️"
+        if insumo["quantidade"] <= 5:
 
             tabela.insert(
                 "end",
-                f"{insumo['id']} | "
-                f"{insumo['nome']} | "
-                f"{insumo['quantidade']} | "
-                f"{insumo['unidade']}"
-                f"{alerta}\n"
+                f"{insumo['nome']} → "
+                f"{insumo['quantidade']} "
+                f"{insumo['unidade']}\n"
             )
-
-    def adicionar_insumo():
-
-        nome = entry_nome.get()
-
-        quantidade = float(
-            entry_quantidade.get().replace(",", ".")
-        )
-
-        unidade = entry_unidade.get()
-
-        supabase.table("insumos").insert({
-            "nome": nome,
-            "quantidade": quantidade,
-            "unidade": unidade
-        }).execute()
-
-        messagebox.showinfo(
-            "Sucesso",
-            "Insumo adicionado!"
-        )
-
-        atualizar_estoque()
-
-    btn_add = ctk.CTkButton(
-        card,
-        text="Adicionar Insumo",
-        fg_color=COR_BOTAO,
-        height=40,
-        command=adicionar_insumo
-    )
-
-    btn_add.pack(
-        padx=20,
-        pady=20,
-        fill="x"
-    )
-
-    atualizar_estoque()
-
 # ==========================================
 # PRODUTOS
 # ==========================================
 
-def abrir_produtos():
-
-    limpar_tela()
-
-    titulo = ctk.CTkLabel(
-        main_frame,
-        text="Produtos",
-        font=("Arial", 30, "bold")
-    )
-
-    titulo.pack(pady=20)
-
-    tabela = ctk.CTkTextbox(
-        main_frame,
-        fg_color=COR_CARD
-    )
-
-    tabela.pack(
-        padx=20,
-        pady=20,
-        fill="both",
-        expand=True
-    )
-
-    response = supabase.table("produtos").select("*").execute()
-
-    produtos = response.data
-
-    tabela.insert(
-        "end",
-        "ID | PRODUTO | PREÇO\n\n"
-    )
-
-    for produto in produtos:
-
-        tabela.insert(
-            "end",
-            f"{produto['id']} | "
-            f"{produto['nome']} | "
-            f"R$ {produto['preco']}\n"
-        )
 
 # ==========================================
 # VENDAS
@@ -665,8 +636,24 @@ def criar_botao(texto, comando):
     )
 
 criar_botao("Dashboard", abrir_dashboard)
-criar_botao("Estoque", abrir_estoque)
-criar_botao("Produtos", abrir_produtos)
+criar_botao(
+    "Estoque",
+    lambda: abrir_estoque(
+        main_frame,
+        limpar_tela,
+        COR_CARD,
+        COR_BOTAO
+    )
+)
+criar_botao(
+    "Produtos",
+    lambda: abrir_produtos(
+        main_frame,
+        limpar_tela,
+        COR_CARD,
+        COR_BOTAO
+    )
+)
 criar_botao("Vendas", abrir_vendas)
 criar_botao("Relatórios", abrir_relatorios)
 
